@@ -22,8 +22,8 @@ need it.
    ```
    An existing `~/vendor/psychopomp` cloned from kitlangton converts in place:
    rename its `origin` to `upstream`, add the fork as `origin`, and check out
-   `films`. Install Rust (rustup, stable), `bun`, `uv`, `jq`, `ffmpeg` with
-   libx264, and ImageMagick (`magick`). Put `ELEVENLABS_API_KEY` in the clone's
+   `films`. Install Rust (rustup, stable), `bun`, `uv`, `jq`, and `ffmpeg` with
+   libx264. Put `ELEVENLABS_API_KEY` in the clone's
    `.env` (see **Gotchas**). Done when `git remote get-url origin` names the fork,
    the branch is `films`, and `cargo build --release` succeeds.
 2. **Update the clone**: `git -C ~/vendor/psychopomp pull --ff-only`. The clone
@@ -33,8 +33,10 @@ need it.
    restore, since cargo regenerates them. Ask when someone else's edit blocks
    it. Before an existing film's next plain run, run it once with
    `PSYCHOPOMP_MEDIA=plan`: an upstream change to media keys would otherwise
-   re-voice the whole film (paid, new takes, new timing). Done when HEAD is
-   `origin/films` and every earlier local edit still shows in `git status`.
+   re-voice the whole film (paid, new takes, new timing). When the plan lists a
+   `+` or `~` your own edits did not cause, stop and ask before any plain run,
+   whatever the tool suggests. Done when HEAD is `origin/films` and every
+   earlier local edit still shows in `git status`.
 3. **Load the bundled skills**: in the clone, read
    `.agents/skills/psychopomp/SKILL.md` with its `STORY.md`, then
    `.agents/skills/explainer-motion/SKILL.md`, and the docs they name. Their
@@ -51,19 +53,21 @@ need it.
 5. **Make the film**, and post sneak peeks: embed sheets, snapshots, and render
    frames in chat as each segment takes shape. Scope builds and checks to the
    film (`-p <crate>`); the workspace-wide checks are for engine edits.
-6. **Deliver**: the final MP4's absolute path, embedded where the client renders
+6. **Mix the soundtrack** into the render (**Sound**). Done when `mix.py`
+   prints the master at -16 LUFS and dialog stays well over the music.
+7. **Deliver**: the mixed MP4's absolute path, embedded where the client renders
    media (`![title](/absolute/path.mp4)`), and a list of any engine edits. Then
    delete `target/psychopomp-cache/footage`, which grows about 15 GB per
    re-rendered 1080p pass. A film the requester keeps goes into its layer's
    `films/` (source, plus an asset list saying how each asset was made).
-7. **Keep the layers current**: fold feedback that should outlast this film into
+8. **Keep the layers current**: fold feedback that should outlast this film into
    the layer that owns it, replacing what it supersedes. Craft that holds for any
    film belongs here; a team's products, brand, and footage belong in the team
    layer; one person's voice and taste belong in theirs. Only the fork's owner
-   pushes here, so anyone else records a general lesson in their layer, marked
-   for the base. Everything here and every fork commit message is public: write
-   them in product-neutral terms, with no company, product, customer, or ticket
-   names.
+   pushes here, so anyone else records a general lesson or an engine edit (its
+   diff) in their layer's change, marked for the base. This folder, fork commit
+   messages, branch names, and PR or issue text are public: write them in
+   product-neutral terms, with no company, product, customer, or ticket names.
 
 ## What may change in the clone
 
@@ -73,9 +77,10 @@ footage and scripts.
 
 - **The film**: anything in `scenes/<name>/`, plus renders in `output/<name>/`.
 - **The engine**, when the film needs something it cannot do: a small, general
-  change with tests. Run `verify baseline` before it and
-  `verify compare --expect <scene>` after it, which proves every other scene
-  pixel-identical. It stays a local edit until the fork's owner merges it.
+  change with tests. Run `verify baseline` before it and `verify compare`
+  after it, which proves every scene in `verify.json` pixel-identical
+  (`--expect` names only scenes listed there; films are not, so check the film
+  with its own frames). It stays a local edit until the fork's owner merges it.
 - Everything else stays as it is: other films and other sessions' uncommitted
   edits.
 
@@ -87,7 +92,8 @@ footage and scripts.
 | Product or feature showcase | [PRODUCT.md](PRODUCT.md) | `ios-build-111` |
 | Explainer (architecture, protocol, scope) | | `opencode-jr-architecture` |
 
-Layers add their own films. Each upstream scene's `README.md` says what it is.
+Layers add their own films. An upstream scene says what it is in its
+`README.md` or, without one, in the header of its `src/main.rs` or `src/lib.rs`.
 
 ## Taste
 
@@ -122,9 +128,10 @@ run only from the film.
   `uv run --with numpy mix.py <film>.sound.json <render>.mp4 <out>.mp4` mixes
   them (ducking, pans, reverb, -16 LUFS) and replaces the render's audio.
 - `score.rs` writes `score/plan.json`, a composition plan whose sections end on
-  beats the segments mark; `score/compose.sh` composes one stereo take per seed
-  with the ElevenLabs music model, outside `psychopomp-media` (which makes every
-  sound mono). The model keeps section lengths within about 0.25 s but ignores
+  beats the segments mark; `score/compose.sh plan.json score.mp3 [seed]` (its
+  paths are relative to `score/`) composes one stereo take per seed with the
+  ElevenLabs music model, outside `psychopomp-media` (which makes every sound
+  mono). The film plays without a score until a take exists. The model keeps section lengths within about 0.25 s but ignores
   requested hits, so build each climax in the mix: drop the music just before
   the hit and bring it back after. Rule out vocals in the plan's negative
   styles; `force_instrumental` works only with a prompt. Compose two takes and
@@ -139,9 +146,10 @@ run only from the film.
 - `ELEVENLABS_API_KEY` lives in the clone's `.env`, which is gitignored. The key
   needs text to speech, sound effects, and music generation. Load it with
   `set -a; source .env; set +a` and keep its value out of output.
-- Run the `psychopomp` binary from the clone's root and always with a
-  subcommand. With none, or with `--help`, it renders a 300-frame demo and
-  writes a file named `--help` into the current directory.
+- Run the `psychopomp` binary from the clone's root, always with `plan` or
+  `verify` first. Any other first argument is an output path for a 300-frame
+  demo render: `--help` writes a file named `--help` into the current
+  directory, and no argument writes `output/psychopomp-prototype.mp4`.
 - `bun scripts/sheet.ts` needs ImageMagick. Without `magick`,
   `uv run --with pillow .agents/video/sheet.py <plan> <times> <out.jpg>` makes
   the same sheets.

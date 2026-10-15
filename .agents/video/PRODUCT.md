@@ -4,7 +4,7 @@
 
 - Show the real product, filled with synthetic data from a local demo stack; the layer names the stack. Production and customer data stay out.
 - Use the newest UI and brand, beta screens included, and show each screen whole: zoomed or cropped captures read as "too cropped".
-- Phone recordings play in real time and cut only between identical still frames, so no cut shows.
+- Phone recordings play as acts: each act (a pull, a tap, a sheet opening) plays through at one steady rate, a little faster than life (1.35× read as natural), and the playhead jumps between acts only across identical still frames, so no cut shows.
 - Simulator footage: the iOS simulator recording shows the home screen, a black app-switch frame, and a white Safari frame before the page. Keep them in real time; they make the page open read as real.
 - Browser footage: Playwright's `recordVideo` kept about 2 s of a multi-second portal session. Take screenshots of the whole screen instead (a 1440×900 detail page fills a 1280×800 Stage element).
 - Terminal footage: typeset the session as its own terminal pass (a plan the film writes), render it into `assets/` first, and play it as footage beside the rest.

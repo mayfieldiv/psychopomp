@@ -1,5 +1,5 @@
 //! The score: a composition plan whose sections end on beats the segments mark, composed
-//! by the ElevenLabs music model (`score/compose.sh score/plan.json score/score.mp3`),
+//! by the ElevenLabs music model (`score/compose.sh plan.json score.mp3`, paths in `score/`),
 //! then placed under the film so its two big hits land on the `title` and `climax`
 //! beats. Rename the sections and beats to the film's, and rewrite the styles.
 use std::path::Path;
