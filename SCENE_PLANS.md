@@ -513,6 +513,8 @@ reusable for any code explainer:
   and `words()` every word with its start and end.
 - `psychopomp::editor::diff::Diff` of `keep`/`add(step, ..)`/`remove(step, ..)`
   lines declares the stepped editor; `declare(scene, step_times, warning, entrance)`.
+  The extension of its `file_name` picks the highlighter: `.cs` is C#; `.xml`,
+  `.props`, `.targets`, and `.csproj` are XML; anything else is TypeScript.
   A hand-built editor recipe (one with semantic ranges to pin a callout, say)
   gets the same room-opening steps from `diff::step_snapshots(previous, next,
   at)` plus `diff::gap_lines(&snapshots)`.
