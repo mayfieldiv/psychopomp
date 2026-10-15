@@ -1,12 +1,13 @@
-//! A small TypeScript/JavaScript highlighter that compiles one source line into
-//! styled spans for the editor recipe. Roles follow the Presentation Theme syntax
-//! mapping: keywords, function calls as the accent, capitalized names as types,
-//! strings, muted comments, and numbers. It is a line-local approximation for
-//! explainers, not a parser: template literals and block comments that span lines
-//! are not tracked.
+//! Small highlighters that compile one source line into styled spans for the
+//! editor recipe: TypeScript/JavaScript, C#, and XML (MSBuild files). Roles follow
+//! the Presentation Theme syntax mapping: keywords, function calls as the accent,
+//! capitalized names as types, strings, muted comments, and numbers; XML tags read
+//! as keywords and attribute names as types. Each is a line-local approximation
+//! for explainers, not a parser: template literals, verbatim strings, and comments
+//! that span lines are not tracked.
 use crate::code::{StyledSpan, SyntaxStyle};
 
-const KEYWORDS: &[&str] = &[
+const TYPESCRIPT: &[&str] = &[
     "as",
     "async",
     "await",
@@ -51,23 +52,156 @@ const KEYWORDS: &[&str] = &[
     "yield",
 ];
 
+/// C# keywords, including the lowercase built-in type names (`bool`, `byte`)
+/// that the capitalized-name rule would otherwise leave plain.
+const CSHARP: &[&str] = &[
+    "abstract",
+    "as",
+    "async",
+    "await",
+    "base",
+    "bool",
+    "break",
+    "byte",
+    "case",
+    "catch",
+    "char",
+    "checked",
+    "class",
+    "const",
+    "continue",
+    "decimal",
+    "default",
+    "delegate",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "event",
+    "explicit",
+    "extern",
+    "false",
+    "finally",
+    "fixed",
+    "float",
+    "for",
+    "foreach",
+    "goto",
+    "if",
+    "implicit",
+    "in",
+    "int",
+    "interface",
+    "internal",
+    "is",
+    "lock",
+    "long",
+    "nameof",
+    "namespace",
+    "new",
+    "not",
+    "null",
+    "object",
+    "operator",
+    "out",
+    "override",
+    "params",
+    "partial",
+    "private",
+    "protected",
+    "public",
+    "readonly",
+    "record",
+    "ref",
+    "return",
+    "sbyte",
+    "sealed",
+    "short",
+    "sizeof",
+    "stackalloc",
+    "static",
+    "string",
+    "struct",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "uint",
+    "ulong",
+    "unchecked",
+    "unsafe",
+    "ushort",
+    "using",
+    "var",
+    "virtual",
+    "void",
+    "volatile",
+    "while",
+    "yield",
+];
+
 /// Muted gray: neutral, so every theme maps it to its muted text color.
 pub const COMMENT: SyntaxStyle = SyntaxStyle::Rgb(128, 128, 128);
 /// Numbers keep one warm color in every theme.
 pub const NUMBER: SyntaxStyle = SyntaxStyle::Rgb(245, 167, 66);
 
+/// The highlighter for `file_name`'s extension: C# for `.cs`, XML for `.xml` and
+/// MSBuild files, and TypeScript for everything else.
+pub fn for_file(file_name: &str) -> fn(&str) -> Vec<StyledSpan> {
+    match file_name.rsplit('.').next().unwrap_or_default() {
+        "cs" => csharp,
+        "xml" | "props" | "targets" | "csproj" => xml,
+        _ => typescript,
+    }
+}
+
+/// How a C-like language spells its words and strings.
+struct Syntax {
+    keywords: &'static [&'static str],
+    quotes: &'static [char],
+    /// Characters besides letters, digits, and `_` that identifiers may contain.
+    word: &'static [char],
+}
+
 pub fn typescript(line: &str) -> Vec<StyledSpan> {
+    c_like(
+        line,
+        &Syntax {
+            keywords: TYPESCRIPT,
+            quotes: &['"', '\'', '`'],
+            word: &['$'],
+        },
+    )
+}
+
+pub fn csharp(line: &str) -> Vec<StyledSpan> {
+    c_like(
+        line,
+        &Syntax {
+            keywords: CSHARP,
+            quotes: &['"', '\''],
+            word: &[],
+        },
+    )
+}
+
+/// Appends `text` in `style`, merging it into the last span when the styles match.
+fn push(spans: &mut Vec<StyledSpan>, text: &str, style: SyntaxStyle) {
+    if text.is_empty() {
+        return;
+    }
+    match spans.last_mut() {
+        Some(last) if same(last.style, style) => last.text.push_str(text),
+        _ => spans.push(StyledSpan::new(text, style)),
+    }
+}
+
+fn c_like(line: &str, syntax: &Syntax) -> Vec<StyledSpan> {
     let chars = line.char_indices().collect::<Vec<_>>();
     let mut spans: Vec<StyledSpan> = Vec::new();
-    let push = |spans: &mut Vec<StyledSpan>, text: &str, style: SyntaxStyle| {
-        if text.is_empty() {
-            return;
-        }
-        match spans.last_mut() {
-            Some(last) if same(last.style, style) => last.text.push_str(text),
-            _ => spans.push(StyledSpan::new(text, style)),
-        }
-    };
+    let word = |c: char| c.is_alphanumeric() || c == '_' || syntax.word.contains(&c);
     let slice = |from: usize, to: usize| {
         let start = chars.get(from).map_or(line.len(), |(i, _)| *i);
         let end = chars.get(to).map_or(line.len(), |(i, _)| *i);
@@ -80,7 +214,7 @@ pub fn typescript(line: &str) -> Vec<StyledSpan> {
             push(&mut spans, slice(index, chars.len()), COMMENT);
             break;
         }
-        if matches!(c, '"' | '\'' | '`') {
+        if syntax.quotes.contains(&c) {
             let mut end = index + 1;
             while end < chars.len() && chars[end].1 != c {
                 end += if chars[end].1 == '\\' { 2 } else { 1 };
@@ -101,11 +235,9 @@ pub fn typescript(line: &str) -> Vec<StyledSpan> {
             index = end;
             continue;
         }
-        if c.is_alphabetic() || c == '_' || c == '$' {
+        if word(c) && !c.is_numeric() {
             let mut end = index + 1;
-            while end < chars.len()
-                && (chars[end].1.is_alphanumeric() || matches!(chars[end].1, '_' | '$'))
-            {
+            while end < chars.len() && word(chars[end].1) {
                 end += 1;
             }
             let word = slice(index, end);
@@ -115,7 +247,7 @@ pub fn typescript(line: &str) -> Vec<StyledSpan> {
                 .find(|c| !c.is_whitespace())
                 == Some('(');
             let member = index > 0 && chars[index - 1].1 == '.';
-            let style = if KEYWORDS.contains(&word) && !member {
+            let style = if syntax.keywords.contains(&word) && !member {
                 SyntaxStyle::Keyword
             } else if called {
                 SyntaxStyle::Accent
@@ -130,6 +262,52 @@ pub fn typescript(line: &str) -> Vec<StyledSpan> {
         }
         push(&mut spans, slice(index, index + 1), SyntaxStyle::Plain);
         index += 1;
+    }
+    spans
+}
+
+/// XML: tag names as keywords, attribute names as types, quoted values as
+/// strings, comments muted, and markup punctuation and text between tags plain.
+pub fn xml(line: &str) -> Vec<StyledSpan> {
+    let mut spans: Vec<StyledSpan> = Vec::new();
+    let name = |c: char| c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | ':');
+    let mut rest = line;
+    let mut in_tag = false;
+    while let Some(c) = rest.chars().next() {
+        let (text, style, tag) = if !in_tag && rest.starts_with("<!--") {
+            let end = rest.find("-->").map_or(rest.len(), |at| at + 3);
+            (&rest[..end], COMMENT, false)
+        } else if !in_tag && c == '<' {
+            let open = if rest.starts_with("</") { 2 } else { 1 };
+            (&rest[..open], SyntaxStyle::Plain, true)
+        } else if !in_tag {
+            (
+                &rest[..rest.find('<').unwrap_or(rest.len())],
+                SyntaxStyle::Plain,
+                false,
+            )
+        } else if c == '>' || rest.starts_with("/>") {
+            let close = if c == '>' { 1 } else { 2 };
+            (&rest[..close], SyntaxStyle::Plain, false)
+        } else if matches!(c, '"' | '\'') {
+            let end = rest[1..].find(c).map_or(rest.len(), |at| at + 2);
+            (&rest[..end], SyntaxStyle::String, true)
+        } else if name(c) {
+            let end = rest.find(|c: char| !name(c)).unwrap_or(rest.len());
+            // The first name after `<` or `</` is the tag; later names are attributes.
+            let style = match spans.last() {
+                Some(last) if last.text.ends_with('<') || last.text.ends_with("</") => {
+                    SyntaxStyle::Keyword
+                }
+                _ => SyntaxStyle::Type,
+            };
+            (&rest[..end], style, true)
+        } else {
+            (&rest[..c.len_utf8()], SyntaxStyle::Plain, true)
+        };
+        push(&mut spans, text, style);
+        in_tag = tag;
+        rest = &rest[text.len()..];
     }
     spans
 }
@@ -152,7 +330,11 @@ mod tests {
     use super::*;
 
     fn styles(line: &str) -> Vec<(String, &'static str)> {
-        typescript(line)
+        roles(typescript(line))
+    }
+
+    fn roles(spans: Vec<StyledSpan>) -> Vec<(String, &'static str)> {
+        spans
             .into_iter()
             .map(|span| {
                 let name = match span.style {
@@ -211,5 +393,88 @@ mod tests {
         let last = spans.last().unwrap();
         assert!(last.text.ends_with("x.default") && matches!(last.style, SyntaxStyle::Plain));
         assert!(styles(line).contains(&("\"a\\\"b\"".into(), "string")));
+    }
+
+    #[test]
+    fn csharp_keywords_include_its_lowercase_type_names() {
+        assert_eq!(
+            roles(csharp("public static bool Verify(ReadOnlySpan<byte> key)")),
+            vec![
+                ("public".into(), "keyword"),
+                (" ".into(), "plain"),
+                ("static".into(), "keyword"),
+                (" ".into(), "plain"),
+                ("bool".into(), "keyword"),
+                (" ".into(), "plain"),
+                ("Verify".into(), "accent"),
+                ("(".into(), "plain"),
+                ("ReadOnlySpan".into(), "type"),
+                ("<".into(), "plain"),
+                ("byte".into(), "keyword"),
+                ("> key)".into(), "plain"),
+            ]
+        );
+        assert_eq!(
+            roles(csharp("var $x = `a`")),
+            vec![("var".into(), "keyword"), (" $x = `a`".into(), "plain"),],
+            "C# has no backtick strings or `$` in names"
+        );
+    }
+
+    #[test]
+    fn xml_tags_attributes_values_and_comments_take_their_roles() {
+        assert_eq!(
+            roles(xml("  <RuntimeLibrary>MultiThreaded</RuntimeLibrary>")),
+            vec![
+                ("  <".into(), "plain"),
+                ("RuntimeLibrary".into(), "keyword"),
+                (">MultiThreaded</".into(), "plain"),
+                ("RuntimeLibrary".into(), "keyword"),
+                (">".into(), "plain"),
+            ]
+        );
+        assert_eq!(
+            roles(xml(r#"<Group Condition="'$(A)' == 'B'">"#)),
+            vec![
+                ("<".into(), "plain"),
+                ("Group".into(), "keyword"),
+                (" ".into(), "plain"),
+                ("Condition".into(), "type"),
+                ("=".into(), "plain"),
+                (r#""'$(A)' == 'B'""#.into(), "string"),
+                (">".into(), "plain"),
+            ]
+        );
+        assert_eq!(
+            roles(xml("<!-- static CRT --> <Link/>")),
+            vec![
+                ("<!-- static CRT -->".into(), "comment"),
+                (" <".into(), "plain"),
+                ("Link".into(), "keyword"),
+                ("/>".into(), "plain"),
+            ]
+        );
+        let line = r#"<a b="c" d='e'>f <!-- g"#;
+        assert_eq!(
+            xml(line)
+                .iter()
+                .map(|s| s.text.as_str())
+                .collect::<String>(),
+            line,
+            "text is preserved, even in an unclosed comment"
+        );
+    }
+
+    #[test]
+    fn the_file_extension_picks_the_highlighter() {
+        let first = |file: &str, line: &str| roles(for_file(file)(line)).remove(0);
+        assert_eq!(first("Verify.cs", "public x"), ("public".into(), "keyword"));
+        assert_eq!(first("verify.ts", "public x"), ("public x".into(), "plain"));
+        assert_eq!(
+            first("app.tsx + bootstrap.ts", "const x"),
+            ("const".into(), "keyword")
+        );
+        assert_eq!(first("static-crt.props", "<Link>"), ("<".into(), "plain"));
+        assert_eq!(roles(for_file("a.props")("<Link>"))[1].1, "keyword");
     }
 }

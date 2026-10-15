@@ -93,7 +93,11 @@ impl Line {
         self
     }
 
-    fn plan(&self, id: String) -> Result<(EditorLinePlan, Vec<EditorInlineRevealPlan>)> {
+    fn plan(
+        &self,
+        id: String,
+        highlight: Highlighter,
+    ) -> Result<(EditorLinePlan, Vec<EditorInlineRevealPlan>)> {
         let mark = self.mark.or(if self.until.is_some() {
             Some(LineMarkPlan::Removed)
         } else if self.from > 0 {
@@ -101,7 +105,7 @@ impl Line {
         } else {
             None
         });
-        let mut line = editor_line(id, self.text, mark);
+        let mut line = editor_line(id, self.text, mark, highlight);
         if self.ranges.is_empty() && self.inlays.is_empty() {
             return Ok((line, Vec::new()));
         }
@@ -312,11 +316,12 @@ impl Diff {
             .enumerate()
             .flat_map(|(step, &at)| step_snapshots(&self.rows(step), &self.rows(step + 1), at))
             .collect::<Vec<_>>();
+        let highlight = highlight::for_file(self.file_name);
         let mut reveals = Vec::new();
         let mut lines = Vec::new();
         for (index, line) in self.lines.iter().enumerate() {
             let (line, inlays) = line
-                .plan(id(index))
+                .plan(id(index), highlight)
                 .with_context(|| format!("{} line {index}", self.file_name))?;
             lines.push(line);
             reveals.extend(inlays);
@@ -391,7 +396,7 @@ pub fn gap_lines(snapshots: &[EditorSnapshotPlan]) -> impl Iterator<Item = Edito
         })
         .max()
         .unwrap_or(0);
-    (0..gaps).map(|gap| editor_line(format!("gap-{gap}"), "", None))
+    (0..gaps).map(|gap| editor_line(format!("gap-{gap}"), "", None, highlight::typescript))
 }
 
 /// A pure insertion first opens blank rows where the new lines go; a pure
@@ -428,11 +433,19 @@ fn make_room(previous: &[String], next: &[String]) -> Option<Vec<String>> {
     )
 }
 
-fn editor_line(id: String, text: &str, mark: Option<LineMarkPlan>) -> EditorLinePlan {
+/// Compiles one line of source into styled spans; see [`highlight::for_file`].
+type Highlighter = fn(&str) -> Vec<StyledSpan>;
+
+fn editor_line(
+    id: String,
+    text: &str,
+    mark: Option<LineMarkPlan>,
+    highlight: Highlighter,
+) -> EditorLinePlan {
     let spans = if text.trim().is_empty() {
         vec![StyledSpan::new(" ", SyntaxStyle::Plain)]
     } else {
-        highlight::typescript(text)
+        highlight(text)
     };
     EditorLinePlan {
         id,
