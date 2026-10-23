@@ -132,14 +132,15 @@ run only from the film.
   paths are relative to `score/`) composes one stereo take per seed with the
   ElevenLabs music model, outside `psychopomp-media` (which makes every sound
   mono). The film plays without a score until a take exists. The model keeps section lengths within about 0.25 s but ignores
-  requested hits, so build each climax in the mix: drop the music just before
-  the hit and bring it back after. Rule out vocals in the plan's negative
+  requested hits, so warp the take until its own hits land on the film's beats,
+  and play it straight through them. A breath before a hit, even one a boom
+  fills, reads as the music dropping out. Rule out vocals in the plan's negative
   styles; `force_instrumental` works only with a prompt. Compose two takes and
   compare their loudness per section.
 - You cannot hear the result, so measure it: Whisper transcripts of the
   narration (`uvx --from mlx-whisper mlx_whisper --model mlx-community/whisper-large-v3-turbo <file>`,
-  one file per run), and the bus levels and dialog-over-music margin that
-  `mix.py` prints.
+  one file per run), and the bus levels, dialog-over-music margin, and music
+  silences that `mix.py` prints.
 
 ## Gotchas
 

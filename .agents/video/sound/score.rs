@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use psychopomp::author::{millis, seconds};
+use psychopomp::author::seconds;
 
 use crate::sound::Mix;
 
@@ -114,9 +114,9 @@ pub fn composition_plan(mix: &Mix, end: u64) -> Result<serde_json::Value> {
 }
 
 /// The composed take under everything: the body ducked under the voice, then the build
-/// and the resolve ducked less, so the finale pushes. The music stops for a breath
-/// before the title hit and before the climax, so both land in silence. Returns false
-/// when the take has not been composed yet.
+/// and the resolve ducked less, so the finale pushes. It plays straight through both
+/// hits: a breath before one reads as the music dropping out. Returns false when the
+/// take has not been composed yet.
 pub fn place(mix: &mut Mix, root: &Path, end: u64) -> Result<bool> {
     let file = root.join("score/score.mp3");
     if !file.exists() {
@@ -129,15 +129,8 @@ pub fn place(mix: &mut Mix, root: &Path, end: u64) -> Result<bool> {
     let warp =
         HITS.map(|[open, resolve]| vec![[0.0, 0.0], [open, film(title)], [resolve, film(climax)]]);
     for (bus, from, until, ramp) in [
-        ("music", 0, title - millis(300), None),
-        ("music", title, build, None),
-        (
-            "lift",
-            build,
-            climax - millis(450),
-            Some([3.0, film(climax - build)]),
-        ),
-        ("lift", climax, end, None),
+        ("music", 0, build, None),
+        ("lift", build, end, Some([3.0, film(climax - build)])),
     ] {
         let cue = mix.add_at_reel(bus, &file, from, GAIN);
         cue.offset = film(from);

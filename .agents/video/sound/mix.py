@@ -188,6 +188,23 @@ def duck(dialog: np.ndarray, depth_db: float) -> np.ndarray:
     return db(to_samples(reduction, len(dialog)))[:, None]
 
 
+def silences(signal: np.ndarray, floor_db: float = -60.0, shortest: float = 0.1) -> list[tuple[float, float]]:
+    """Stretches of at least `shortest` seconds below `floor_db`, between the signal's first sound and its last."""
+    quiet = control(signal) < floor_db
+    sounding = np.flatnonzero(~quiet)
+    if not len(sounding):
+        return []
+    found, start = [], None
+    for index in range(sounding[0], sounding[-1] + 1):
+        if quiet[index] and start is None:
+            start = index
+        elif not quiet[index] and start is not None:
+            if (index - start) * BLOCK / SR >= shortest:
+                found.append((start * BLOCK / SR, index * BLOCK / SR))
+            start = None
+    return found
+
+
 def room_impulse() -> np.ndarray:
     """A small bright room: early reflections, then a tail whose highs die first."""
     rng = np.random.default_rng(7)
@@ -313,6 +330,9 @@ def main() -> None:
         print(f"  {name:15s} {level:6.1f} LUFS (pre-master)")
     print(f"  dialog over music while speaking: median {np.median(ratio):.1f} dB, 10th pct {np.percentile(ratio, 10):.1f} dB")
     print(f"  master {integrated:.1f} LUFS, true peak {true_peak:.1f} dBTP")
+    # Each one is a dropout a viewer hears.
+    for start, end in silences(buses["music"] + buses["lift"]):
+        print(f"  music silent {start:.2f}-{end:.2f} s ({end - start:.2f} s)")
 
     if "--stems" in sys.argv:
         stems = Path(output).with_suffix("")
