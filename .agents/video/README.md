@@ -55,12 +55,22 @@ need it.
    film (`-p <crate>`); the workspace-wide checks are for engine edits.
 6. **Mix the soundtrack** into the render (**Sound**). Done when `mix.py`
    prints the master at -16 LUFS and dialog stays well over the music.
-7. **Deliver**: the mixed MP4's absolute path, embedded where the client renders
+7. **Review it as a viewer would**, before anyone sees it. A contact sheet
+   shows the story, but it is too small to show a pointer off its target, soft
+   text, or a flash. On the mixed film, run
+   `uv run --with ocrmac --with numpy --with pillow .agents/video/review.py <film>.mp4 --label '<text>'…`
+   with each text the film puts on screen: it fails a label that reads for
+   under a second, and text the camera magnifies past its source's pixels. Each
+   `music silent` line `mix.py` prints is a dropout a viewer hears: remove it.
+   Then give a reviewer that has not seen the script full-size frames at each
+   click, cut, and label, and ask what a viewer would notice. Done when
+   `review.py` exits 0 and each finding is fixed or answered.
+8. **Deliver**: the mixed MP4's absolute path, embedded where the client renders
    media (`![title](/absolute/path.mp4)`), and a list of any engine edits. Then
    delete `target/psychopomp-cache/footage`, which grows about 15 GB per
    re-rendered 1080p pass. A film the requester keeps goes into its layer's
    `films/` (source, plus an asset list saying how each asset was made).
-8. **Keep the layers current**: fold feedback that should outlast this film into
+9. **Keep the layers current**: fold feedback that should outlast this film into
    the layer that owns it, replacing what it supersedes. Craft that holds for any
    film belongs here; a team's products, brand, and footage belong in the team
    layer; one person's voice and taste belong in theirs. Only the fork's owner
