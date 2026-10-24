@@ -59,14 +59,18 @@ need it.
    shows the story, but it is too small to show a pointer off its target, soft
    text, or a flash. On the mixed film, run
    `uv run --with ocrmac --with numpy --with pillow .agents/video/review.py <film>.mp4 --label '<text>'…`
-   with each text the film puts on screen: it fails a label that reads for
-   under a second, and text the camera magnifies past its source's pixels. Each
-   `music silent` line `mix.py` prints is a dropout a viewer hears: remove it.
-   Then give a reviewer that has not seen the script full-size frames at each
-   click, cut, and label, and ask what a viewer would notice. Done when
-   `review.py` exits 0 and each finding is fixed or answered.
+   with each text the film puts on screen: it fails a label on screen too
+   briefly to read (a second, longer for more words), text the camera
+   magnifies past its source's pixels, and a flash (a change of up to three
+   frames that the frames around it agree on). `mix.py` fails when the music
+   drops out: each `music silent` line is a dropout a viewer hears. Then give a
+   reviewer that has not seen the script full-size frames at each click, cut,
+   and label, and ask what a viewer would notice. Done when `mix.py` and
+   `review.py` exit 0 and each finding is fixed or answered.
 8. **Deliver**: the mixed MP4's absolute path, embedded where the client renders
-   media (`![title](/absolute/path.mp4)`), and a list of any engine edits. Then
+   media (`![title](/absolute/path.mp4)`), its `shasum -a 256`, and a list of
+   any engine edits. The requester approves that exact file before anyone else
+   sees it; a change makes a new file to approve. Then
    delete `target/psychopomp-cache/footage`, which grows about 15 GB per
    re-rendered 1080p pass. A film the requester keeps goes into its layer's
    `films/` (source, plus an asset list saying how each asset was made).
@@ -150,7 +154,8 @@ run only from the film.
 - You cannot hear the result, so measure it: Whisper transcripts of the
   narration (`uvx --from mlx-whisper mlx_whisper --model mlx-community/whisper-large-v3-turbo <file>`,
   one file per run), and the bus levels, dialog-over-music margin, and music
-  silences that `mix.py` prints.
+  silences that `mix.py` prints. It writes the mix either way, so a failing
+  one can still be heard.
 
 ## Gotchas
 

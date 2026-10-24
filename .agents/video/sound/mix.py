@@ -6,7 +6,8 @@ Buses: dialog (center, on top), music (stereo beds, ducked under dialog; `lift`
 beds duck less), ambience
 (ducked less, widened), fx (panned one-shots and sweeps). Effects feed a short room
 reverb. The master is glued by a gentle compressor, normalized to -16 LUFS and limited
-under -1.5 dBTP.
+under -1.5 dBTP. Exits 1 after writing <out.mp4> when the music falls silent mid-film: a
+viewer hears each such stretch as a dropout.
 """
 
 import json
@@ -330,8 +331,8 @@ def main() -> None:
         print(f"  {name:15s} {level:6.1f} LUFS (pre-master)")
     print(f"  dialog over music while speaking: median {np.median(ratio):.1f} dB, 10th pct {np.percentile(ratio, 10):.1f} dB")
     print(f"  master {integrated:.1f} LUFS, true peak {true_peak:.1f} dBTP")
-    # Each one is a dropout a viewer hears.
-    for start, end in silences(buses["music"] + buses["lift"]):
+    dropouts = silences(buses["music"] + buses["lift"])
+    for start, end in dropouts:
         print(f"  music silent {start:.2f}-{end:.2f} s ({end - start:.2f} s)")
 
     if "--stems" in sys.argv:
@@ -354,6 +355,9 @@ def main() -> None:
     )
     wav.unlink()
     print(f"wrote {output}")
+    if dropouts:
+        print(f"FAIL: the music drops out {len(dropouts)} time(s); {output} is written to listen to, not to deliver")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
