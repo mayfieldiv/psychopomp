@@ -6,8 +6,9 @@ Buses: dialog (center, on top), music (stereo beds, ducked under dialog; `lift`
 beds duck less), ambience
 (ducked less, widened), fx (panned one-shots and sweeps). Effects feed a short room
 reverb. The master is glued by a gentle compressor, normalized to -16 LUFS and limited
-under -1.5 dBTP. Exits 1 after writing <out.mp4> when the music falls silent mid-film: a
-viewer hears each such stretch as a dropout.
+under -1.5 dBTP. Exits 1 after writing <out.mp4> when the music falls silent mid-film, or a
+music cue's take ends before the length the film gave it: a viewer hears
+each as a dropout.
 """
 
 import json
@@ -281,6 +282,8 @@ def main() -> None:
     keys = [cue for cue in sheet["cues"] if cue["key"]]
     clicks = key_clicks(keys[0]["path"]) if keys else []
     rng = np.random.default_rng(11)
+    # Music cues whose audio stops before the length the film gave them: a score that ends before the closing shot.
+    short: list[tuple[float, float]] = []
 
     for index, cue in enumerate(sheet["cues"]):
         bus = cue["bus"]
@@ -296,6 +299,11 @@ def main() -> None:
             signal = decode(cue["path"], 1)
         signal = shape(signal, cue)
         at = cue["at"]
+        if bus in ("music", "lift") and cue.get("length"):
+            sounding = np.flatnonzero(control(signal) > -60.0)
+            heard = (sounding[-1] + 1) * BLOCK / SR if len(sounding) else 0.0
+            if heard < cue["length"] - max(0.25, cue.get("fadeOut", 0)):
+                short.append((at + heard, at + cue["length"]))
         if bus == "fx" and not cue["key"]:
             at -= onset_offset(signal) / SR - 0.005
         if bus in ("dialog", "music", "lift"):
@@ -334,6 +342,9 @@ def main() -> None:
     dropouts = silences(buses["music"] + buses["lift"])
     for start, end in dropouts:
         print(f"  music silent {start:.2f}-{end:.2f} s ({end - start:.2f} s)")
+    for start, end in short:
+        print(f"  music missing {start:.2f}-{end:.2f} s: its take ends before its cue does")
+    dropouts += short
 
     if "--stems" in sys.argv:
         stems = Path(output).with_suffix("")

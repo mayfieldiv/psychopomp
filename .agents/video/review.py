@@ -7,8 +7,7 @@ macOS's text recognition reads each frame (at --fps), again where it read nothin
 purpose (a title, a pill, a card): it fails when no unbroken stretch of frames shows it long enough to read (READ_*),
 read as a whole line, so the same words inside a longer line (the product's own text) do not count. Text is soft where SOFT_LINES or more lines, and at least
 half of those it can measure, have edges shallower than SOFT for SOFT_SECONDS: a modal's own blurred backdrop is a few
-soft lines among sharp ones. A flash is a change, anywhere in a FLASH_TILES grid, that lasts at most FLASH_FRAMES frames
-at the film's own rate and that the frames before and after it agree on. Exits 1 when anything fails.
+soft lines among sharp ones. A flash is a change, anywhere in a FLASH_TILES grid, that lasts at most FLASH_SECONDS and that the frames before and after it agree on. Exits 1 when anything fails.
 """
 
 import argparse
@@ -38,7 +37,8 @@ MIN_CONTRAST = 40
 # 8, an electric edge effect 18, a glitched frame 127.
 FLASH_WIDTH = 192
 FLASH_TILES = (16, 9)
-FLASH_FRAMES = 3
+# A glitch held two frames of 30 fps footage lasts four frames of a 60 fps render, so the window is in time.
+FLASH_SECONDS = 0.1
 FLASH = 30.0
 FLASH_AGREE = 4.0
 # The recognizer sometimes returns nothing for a frame with text on it (seen under load).
@@ -114,14 +114,16 @@ def flashes(film: str) -> list[tuple[float, int]]:
         ["ffmpeg", "-v", "error", "-i", film, "-vf", f"scale={width}:{height}:flags=area,format=gray", "-f", "rawvideo", "-"],
         capture_output=True, check=True,
     ).stdout
-    frames = np.frombuffer(raw, np.uint8).reshape(-1, height, width).astype(np.int16)
+    # Kept as bytes, widened a batch at a time: a ten-minute 60 fps film is about 750 MB here.
+    frames = np.frombuffer(raw, np.uint8).reshape(-1, height, width)
+    longest = max(1, round(FLASH_SECONDS * fps))
 
     def apart(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-        d = np.abs(a - b).astype(np.float32)
+        d = np.abs(a.astype(np.int16) - b).astype(np.float32)
         return d.reshape(len(d), rows, height // rows, columns, width // columns).mean(axis=(2, 4))
 
     hits: list[tuple[int, int]] = []
-    for length in range(1, FLASH_FRAMES + 1):
+    for length in range(1, longest + 1):
         for start in range(1, len(frames) - length, 256):
             stop = min(start + 256, len(frames) - length)
             before, after = frames[start - 1 : stop - 1], frames[start + length : stop + length]

@@ -61,9 +61,10 @@ need it.
    `uv run --with ocrmac --with numpy --with pillow .agents/video/review.py <film>.mp4 --label '<text>'…`
    with each text the film puts on screen: it fails a label on screen too
    briefly to read (a second, longer for more words), text the camera
-   magnifies past its source's pixels, and a flash (a change of up to three
-   frames that the frames around it agree on). `mix.py` fails when the music
-   drops out: each `music silent` line is a dropout a viewer hears. Then give a
+   magnifies past its source's pixels, and a flash (a change lasting up to a
+   tenth of a second that the frames around it agree on). `mix.py` fails when
+   the music drops out: each `music silent` or `music missing` line is a
+   dropout a viewer hears. Then give a
    reviewer that has not seen the script full-size frames at each click, cut,
    and label, and ask what a viewer would notice. Done when `mix.py` and
    `review.py` exit 0 and each finding is fixed or answered.
